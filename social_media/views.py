@@ -45,7 +45,7 @@ class UserProfileViewSet(
         return UserProfileSerializer
 
     def get_queryset(self):
-        queryset = self.queryset
+        queryset = self.queryset.prefetch_related("followers")
         # filtering by email, first_name, last_name
         name = self.request.query_params.get("name")
         if name:
