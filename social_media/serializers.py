@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
+from social_media.models import Post, Comment
+
 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -72,3 +74,68 @@ class UserFollowSerializer(serializers.ModelSerializer):
         model = get_user_model()
         fields = ("id", "email", "full_name", "profile_picture", )
         read_only_fields = ("email", "full_name", "profile_picture", )
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ("id", "message", "created_at", )
+        ordering = ("-created_at",)
+
+
+class PostSerializer(serializers.ModelSerializer):
+    post_at = serializers.DateTimeField(
+        write_only=False, required=False
+    )
+
+    class Meta:
+        model = Post
+        fields = ("id", "user", "content", "created_at", "post_at", "image", "likes")
+        read_only_fields = ("user", )
+
+
+class PostUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ("id", "user", "content", "created_at", "likes")
+
+
+class PostImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ("id", "user", "image", )
+        read_only_fields = ("user", )
+
+
+class PostLikeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = ("id", "user", )
+        read_only_fields = ("user", )
+
+
+class PostListSerializer(serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(slug_field="email", read_only=True)
+    likes_count = serializers.IntegerField(read_only=True)
+    comments_count = serializers.IntegerField(read_only=True)
+    class Meta:
+        model = Post
+        fields = ("id", "user", "content", "created_at", "likes_count", "comments_count", "image", )
+        ordering = ("created_at",)
+
+
+class PostDetailSerializer(serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(slug_field="email", read_only=True)
+    likes = serializers.SlugRelatedField(slug_field="email", read_only=True, many=True)
+    likes_count = serializers.IntegerField(read_only=True)
+    comments_count = serializers.IntegerField(read_only=True)
+    comments = CommentSerializer(read_only=True, many=True)
+    class Meta:
+        model = Post
+        fields = (
+            "id", "user", "content", "created_at", "image",
+            "likes_count", "likes",
+            "comments_count", "comments",
+        )
+        read_only_fields = ("image", )
+
