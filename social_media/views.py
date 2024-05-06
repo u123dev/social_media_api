@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count, Q
 from rest_framework import generics, viewsets, status, mixins
 from rest_framework.decorators import action
@@ -6,13 +7,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from social_media.models import Post
 from user.permissions import IsOwnerOrReadOnly
 from social_media.serializers import (
     UserProfileListSerializer,
     UserProfileDetailSerializer,
     UserProfileSerializer,
     UserProfilePictureSerializer,
-    UserFollowSerializer,
+    UserFollowSerializer, PostSerializer, PostDetailSerializer, PostListSerializer, PostUpdateSerializer,
+    PostImageSerializer, CommentSerializer, PostLikeSerializer,
 )
 
 
@@ -38,7 +41,7 @@ class UserProfileViewSet(
             return UserProfileListSerializer
         if self.action == "retrieve":
             return UserProfileDetailSerializer
-        if self.action == "upload":
+        if self.action == "set_picture":
             return UserProfilePictureSerializer
         if self.action in ("follow", "unfollow"):
             return UserFollowSerializer
@@ -65,7 +68,7 @@ class UserProfileViewSet(
         permission_classes=[IsOwnerOrReadOnly],
     )
     def set_picture(self, request, pk=None):
-        """Endpoint for uploading picture of user profile"""
+        """Endpoint for uploading user profile picture"""
         user = self.get_object()
         serializer = self.get_serializer(user, data=request.data)
 
@@ -108,4 +111,126 @@ class UserProfileViewSet(
         user = self.get_object()
         followed_by = user.followed_by.all()
         serializer = UserFollowSerializer(followed_by, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+#########
+class PostViewSet(
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    # mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    GenericViewSet
+):
+    queryset = Post.objects.annotate(
+        likes_count=Count("likes", distinct=True),
+        comments_count=Count("comments", distinct=True),
+    ).select_related("user")
+    serializer_class = PostSerializer
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return PostListSerializer
+        if self.action == "update":
+            return PostUpdateSerializer
+        if self.action == "retrieve":
+            return PostDetailSerializer
+        if self.action == "image":
+            return PostImageSerializer
+        if self.action == "comment":
+            return CommentSerializer
+        if self.action in ("like", "unlike"):
+            return PostLikeSerializer
+
+        return PostSerializer
+
+    def get_queryset(self):
+        queryset = self.queryset
+
+        tag = self.request.query_params.get("tag")
+        if tag:
+            queryset = queryset.filter(content__icontains=tag)
+
+        if self.action == "list":
+            queryset = queryset.filter(
+                Q(user=self.request.user)
+                | Q(user__in=self.request.user.followed_by.values("id"))
+            )
+
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        user_id = request.user.id
+        # user = request.user
+        user =request.data.get("user")
+
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        post_at = request.data.get("post_at")
+
+        if post_at:
+            try:
+                creator = get_user_model().objects.get(pk=user_id)
+                Post.objects.create(
+                    content=post_at+" *** "+request.data.get("content"),
+                    image=request.FILES.get("image"),
+                    user=creator,
+                )
+            except ObjectDoesNotExist:
+                return Response(
+                    f"Impossible to post by this user: {user_id}",
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            return Response(
+                f"Post will be published at {post_at}",
+                status=status.HTTP_200_OK
+            )
+
+        serializer.save(user=user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(
+        methods=["POST", "GET"],
+        detail=True,
+        url_path="image",
+        # permission_classes=[IsOwnerOrReadOnly],
+    )
+    def image(self, request, pk=None):
+        """Endpoint for uploading post image"""
+        post = self.get_object()
+        serializer = self.get_serializer(post, data=request.data)
+
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(methods=["POST"], detail=True)
+    def comment(self, request, pk=None):
+        serializer = CommentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=False)
+        serializer.save(
+            post_id=pk,
+            user=self.request.user,
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["POST"],
+            permission_classes=[IsAuthenticated])
+    def like(self, request, pk=None):
+        post_to_like = self.get_object()
+        post_to_like.likes.add(self.request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["POST"],
+            permission_classes=[IsAuthenticated])
+    def unlike(self, request, pk=None):
+        post_to_like = self.get_object()
+        post_to_like.likes.remove(self.request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, url_path="liked_posts")
+    def liked_posts(self, request, pk=None):
+        posts = Post.objects.filter(likes=self.request.user)
+        serializer = PostListSerializer(posts, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
