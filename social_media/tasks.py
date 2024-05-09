@@ -17,19 +17,19 @@ def publish_post(content, image_data, user_id):
     creator = get_user_model().objects.get(pk=user_id)
 
     if image_data:
-        byte_data = image_data['image'].encode(encoding='utf-8')
+        byte_data = image_data["image"].encode(encoding="utf-8")
         b = base64.b64decode(byte_data)
         img = Image.open(io.BytesIO(b))
-        img.save(image_data['name'], format=img.format)
+        img.save(image_data["name"], format=img.format)
 
-        with open(image_data['name'], 'rb') as file:
+        with open(image_data["name"], "rb") as file:
             picture = File(file)
             post = Post.objects.create(
                 content=content,
                 image=picture,
                 user=creator,
             )
-        os.remove(image_data['name'])
+        os.remove(image_data["name"])
     else:
         post = Post.objects.create(
             content=content,

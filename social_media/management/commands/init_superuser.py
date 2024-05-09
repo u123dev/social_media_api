@@ -16,11 +16,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.email = os.environ.get("SUPER_USER")
         self.password = os.environ.get("SUPER_PASSWORD")
-        if (
-                get_user_model().objects.count() == 0
-                and self.email
-                and self.password
-        ):
+        if get_user_model().objects.count() == 0 and self.email and self.password:
             self.stdout.write("Init superuser for database...")
             try:
                 self.admin = get_user_model().objects.create_superuser(

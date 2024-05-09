@@ -35,12 +35,17 @@ class UserProfileViewSet(
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
     mixins.ListModelMixin,
-    GenericViewSet
+    GenericViewSet,
 ):
-    '''User Profile'''
-    queryset = get_user_model().objects.all().annotate(
-        followers_count=(Count("followers", distinct=True)),
-        followed_by_count=(Count("followed_by", distinct=True)),
+    """User Profile"""
+
+    queryset = (
+        get_user_model()
+        .objects.all()
+        .annotate(
+            followers_count=(Count("followers", distinct=True)),
+            followed_by_count=(Count("followed_by", distinct=True)),
+        )
     )
     permission_classes = [IsOwnerUserOrReadOnly]
 
@@ -87,44 +92,60 @@ class UserProfileViewSet(
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["POST"],
-            permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
     def follow(self, request, pk=None):
         """Add current user to followers"""
         user_to_follow = self.get_object()
         user_to_follow.followers.add(self.request.user)
         return Response(
-            {"detail": ("Add follower: " + self.request.user.email
-                        + " to: " + user_to_follow.email)},
-            status=status.HTTP_200_OK
+            {
+                "detail": (
+                    "Add follower: "
+                    + self.request.user.email
+                    + " to: "
+                    + user_to_follow.email
+                )
+            },
+            status=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=["POST"],
-            permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
     def unfollow(self, request, pk=None):
         """Delete current user from followers"""
         user_to_unfollow = self.get_object()
         user_to_unfollow.followers.remove(self.request.user)
         return Response(
-            {"detail": ("Delete follower: " + self.request.user.email
-                        + " from: " + user_to_unfollow.email)},
-            status=status.HTTP_200_OK
+            {
+                "detail": (
+                    "Delete follower: "
+                    + self.request.user.email
+                    + " from: "
+                    + user_to_unfollow.email
+                )
+            },
+            status=status.HTTP_200_OK,
         )
 
-    @action(methods=["GET"], detail=True, url_path="followers",
-            permission_classes=[IsAuthenticated])
+    @action(
+        methods=["GET"],
+        detail=True,
+        url_path="followers",
+        permission_classes=[IsAuthenticated],
+    )
     def get_followers(self, request, pk=None):
         """List all followers"""
         user = self.get_object()
-        serializer = UserFollowSerializer(
-            user.followers.all(), many=True
-        )
+        serializer = UserFollowSerializer(user.followers.all(), many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(methods=["GET"], detail=True, url_path="followed-by",
-            permission_classes=[IsAuthenticated])
+    @action(
+        methods=["GET"],
+        detail=True,
+        url_path="followed-by",
+        permission_classes=[IsAuthenticated],
+    )
     def get_followed_by(self, request, pk=None):
-        """List all users that followed by current user """
+        """List all users that followed by current user"""
         user = self.get_object()
         followed_by = user.followed_by.all()
         serializer = UserFollowSerializer(followed_by, many=True)
@@ -135,8 +156,9 @@ class UserProfileViewSet(
             OpenApiParameter(
                 "name",
                 type=OpenApiTypes.STR,
-                description="Filter by email or first_name or last_name (ex. ?name=value)."
-                            "Case-insensitive lookup that contains value",
+                description="Filter by part of email or first_name "
+                "or last_name (ex. ?name=value). "
+                "Case-insensitive lookup that contains value",
             ),
         ]
     )
@@ -150,7 +172,8 @@ class PostPagination(PageNumberPagination):
 
 
 class PostViewSet(viewsets.ModelViewSet):
-    '''Post CRUD'''
+    """Post CRUD"""
+
     queryset = Post.objects.annotate(
         likes_count=Count("likes", distinct=True),
         comments_count=Count("comments", distinct=True),
@@ -162,7 +185,7 @@ class PostViewSet(viewsets.ModelViewSet):
     ]
 
     def get_permissions(self):
-        """ Returns the list of permissions that this view requires."""
+        """Returns the list of permissions that this view requires."""
         if self.action in ("update", "partial_update"):
             permission_classes = [IsOwnerOrReadOnly]
         else:
@@ -215,21 +238,21 @@ class PostViewSet(viewsets.ModelViewSet):
                 byte = base64.b64encode(image)
                 image_data = {
                     "image": byte.decode("utf-8"),
-                    "name": self.request.FILES.get("image").name
+                    "name": self.request.FILES.get("image").name,
                 }
             else:
                 image_data = None
 
-            post_at = (datetime.strptime(post_at, "%Y-%m-%dT%H:%M")
-                       .astimezone(timezone.utc))
-            publish_post.apply_async(
-                args=[request.data.get("content"),
-                      image_data,
-                      request.user.id],
-                eta=post_at
+            post_at = datetime.strptime(post_at, "%Y-%m-%dT%H:%M").astimezone(
+                timezone.utc
             )
-            return Response(f"Post will be published at {post_at} UTC",
-                            status=status.HTTP_200_OK)
+            publish_post.apply_async(
+                args=[request.data.get("content"), image_data, request.user.id],
+                eta=post_at,
+            )
+            return Response(
+                f"Post will be published at {post_at} UTC", status=status.HTTP_200_OK
+            )
 
         serializer.save(user=user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -260,24 +283,26 @@ class PostViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["POST"],
-            permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
     def like(self, request, pk=None):
         """Endpoint for like of post"""
         post_to_like = self.get_object()
         post_to_like.likes.add(self.request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=["POST"],
-            permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
     def unlike(self, request, pk=None):
         """Endpoint for inlike of post"""
         post_to_like = self.get_object()
         post_to_like.likes.remove(self.request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=False, methods=["GET"], url_path="liked_posts",
-            permission_classes=[IsAuthenticated])
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="liked_posts",
+        permission_classes=[IsAuthenticated],
+    )
     def liked_posts(self, request, pk=None):
         """Endpoint for list of all liked post by current user"""
         posts = Post.objects.filter(likes=self.request.user).select_related()
@@ -290,7 +315,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 "tag",
                 type=OpenApiTypes.STR,
                 description="Filter by tag (ex. ?tag=part-of-post-msg). "
-                            "Case-insensitive lookup that contains tag",
+                "Case-insensitive lookup that contains tag",
             ),
         ]
     )
@@ -299,7 +324,8 @@ class PostViewSet(viewsets.ModelViewSet):
 
 
 class CommentViewSet(viewsets.ModelViewSet):
-    '''Comment CRUD'''
+    """Comment CRUD"""
+
     queryset = Comment.objects.select_related()
     permission_classes = [
         IsOwnerOrReadOnly,
