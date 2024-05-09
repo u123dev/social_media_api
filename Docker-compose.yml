@@ -48,8 +48,8 @@ services:
       - .env
 
   flower:
-    image: mher/flower
-    command: "celery -A social_media_api flower  --broker=redis://redis:6379 --port=5555"
+    image: mher/flower:0.9.7
+    command: ['flower', '--broker=redis://redis:6379']
     ports:
       - 5555:5555
     depends_on:
