@@ -77,10 +77,13 @@ class UserFollowSerializer(serializers.ModelSerializer):
 
 
 class CommentSerializer(serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(slug_field="email", read_only=True)
+
     class Meta:
         model = Comment
-        fields = ("id", "message", "created_at", )
-        ordering = ("-created_at",)
+        fields = ("id", "user", "post", "message", "created_at", )
+        read_only_fields = ("post", )
+        ordering = ("-created_at", )
 
 
 class PostSerializer(serializers.ModelSerializer):
@@ -90,14 +93,13 @@ class PostSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Post
-        fields = ("id", "user", "content", "created_at", "post_at", "image", "likes")
-        read_only_fields = ("user", )
+        fields = ("id", "content", "created_at", "post_at", "image", "likes")
 
 
 class PostUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
-        fields = ("id", "user", "content", "created_at", "likes")
+        fields = ("id", "content", "created_at", )
 
 
 class PostImageSerializer(serializers.ModelSerializer):
@@ -110,26 +112,39 @@ class PostImageSerializer(serializers.ModelSerializer):
 class PostLikeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
-        fields = ("id", "user", )
-        read_only_fields = ("user", )
+        fields = ("id", )
 
 
 class PostListSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(slug_field="email", read_only=True)
     likes_count = serializers.IntegerField(read_only=True)
     comments_count = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Post
-        fields = ("id", "user", "content", "created_at", "likes_count", "comments_count", "image", )
+        fields = (
+            "id",
+            "user",
+            "content",
+            "created_at",
+            "likes_count",
+            "comments_count",
+            "image",
+        )
         ordering = ("created_at",)
 
 
 class PostDetailSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(slug_field="email", read_only=True)
-    likes = serializers.SlugRelatedField(slug_field="email", read_only=True, many=True)
+    likes = serializers.SlugRelatedField(
+        slug_field="email",
+        read_only=True,
+        many=True
+    )
     likes_count = serializers.IntegerField(read_only=True)
     comments_count = serializers.IntegerField(read_only=True)
     comments = CommentSerializer(read_only=True, many=True)
+
     class Meta:
         model = Post
         fields = (
@@ -138,4 +153,3 @@ class PostDetailSerializer(serializers.ModelSerializer):
             "comments_count", "comments",
         )
         read_only_fields = ("image", )
-
