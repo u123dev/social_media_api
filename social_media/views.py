@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 
 from django.contrib.auth import get_user_model
 from django.db.models import Count, Q
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import generics, viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -30,13 +32,12 @@ from social_media.serializers import (
 
 
 class UserProfileViewSet(
-    # mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
-    # mixins.DestroyModelMixin,
     mixins.ListModelMixin,
     GenericViewSet
 ):
+    '''User Profile'''
     queryset = get_user_model().objects.all().annotate(
         followers_count=(Count("followers", distinct=True)),
         followed_by_count=(Count("followed_by", distinct=True)),
@@ -129,20 +130,27 @@ class UserProfileViewSet(
         serializer = UserFollowSerializer(followed_by, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "name",
+                type=OpenApiTypes.STR,
+                description="Filter by email or first_name or last_name (ex. ?name=value)."
+                            "Case-insensitive lookup that contains value",
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
 
 class PostPagination(PageNumberPagination):
     page_size = 3
     max_page_size = 100
 
 
-class PostViewSet(
-    mixins.CreateModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.UpdateModelMixin,
-    mixins.DestroyModelMixin,
-    mixins.ListModelMixin,
-    GenericViewSet
-):
+class PostViewSet(viewsets.ModelViewSet):
+    '''Post CRUD'''
     queryset = Post.objects.annotate(
         likes_count=Count("likes", distinct=True),
         comments_count=Count("comments", distinct=True),
@@ -189,7 +197,8 @@ class PostViewSet(
                 Q(user=self.request.user)
                 | Q(user__in=self.request.user.followed_by.values("id"))
             )
-
+        if self.action == "retrieve":
+            queryset = queryset.prefetch_related("comments__user")
         return queryset
 
     def create(self, request, *args, **kwargs):
@@ -271,13 +280,27 @@ class PostViewSet(
             permission_classes=[IsAuthenticated])
     def liked_posts(self, request, pk=None):
         """Endpoint for list of all liked post by current user"""
-        posts = Post.objects.filter(likes=self.request.user)
+        posts = Post.objects.filter(likes=self.request.user).select_related()
         serializer = PostListSerializer(posts, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "tag",
+                type=OpenApiTypes.STR,
+                description="Filter by tag (ex. ?tag=part-of-post-msg). "
+                            "Case-insensitive lookup that contains tag",
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
 
 class CommentViewSet(viewsets.ModelViewSet):
-    queryset = Comment.objects.all()
+    '''Comment CRUD'''
+    queryset = Comment.objects.select_related()
     permission_classes = [
         IsOwnerOrReadOnly,
     ]
