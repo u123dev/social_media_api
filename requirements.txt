@@ -30,6 +30,8 @@ pillow==10.3.0
 platformdirs==4.2.1
 prometheus_client==0.20.0
 prompt-toolkit==3.0.43
+psycopg==3.1.18
+psycopg2-binary==2.9.9
 pycodestyle==2.11.1
 pyflakes==3.2.0
 PyJWT==2.8.0
@@ -43,6 +45,7 @@ rpds-py==0.18.1
 six==1.16.0
 sqlparse==0.5.0
 tornado==6.4
+typing_extensions==4.11.0
 tzdata==2024.1
 uritemplate==4.1.1
 vine==5.1.0
