@@ -225,6 +225,10 @@ class PostViewSet(viewsets.ModelViewSet):
         return queryset
 
     def create(self, request, *args, **kwargs):
+        """
+        Endpoint for creating post.
+        To Schedule post creation specify the 'Post at' date/time
+        """
         user = request.user
 
         serializer = self.serializer_class(data=request.data)
