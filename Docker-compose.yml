@@ -1,0 +1,60 @@
+version: "3.50"
+
+services:
+  social:
+    build:
+      context: .
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "python manage.py wait_for_db &&
+              python manage.py migrate && 
+              python manage.py init_superuser &&
+              python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./:/app
+      - media:/media
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    restart: always
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - db_data:$PGDATA
+
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+
+  celery:
+    build:
+      context: .
+    command:  "celery -A social_media_api  worker -l info --pool=solo"
+    volumes:
+      - ./:/app
+    depends_on:
+      - social
+      - redis
+    restart: on-failure
+    env_file:
+      - .env
+
+  flower:
+    image: mher/flower:0.9.7
+    command: ['flower', '--broker=redis://redis:6379']
+    ports:
+      - 5555:5555
+    depends_on:
+      - redis
+
+volumes:
+  db_data:
+  media:
