@@ -39,8 +39,9 @@ ___
 * Django 5.+ 
 * Django Rest Framework (DRF) 3.+ 
 * Celery
+* Redis (used as a Broker)
 * Flower (monitoring for Celery)
-* drf spectacular (documentation)
+* drf spectacular (Swagger documentation)
 
 ---
 ### Installation using GitHub
@@ -144,7 +145,7 @@ docker-compose up --build
 - **api/user/token/** 
 
 7. Header to access endpoints:
-- **Authorization: Bearer *< Access Token >***
+- **Authorization: Bearer *<Access Token>***
 
 ### Documentation 
  
